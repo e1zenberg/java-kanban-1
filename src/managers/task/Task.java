@@ -1,6 +1,7 @@
 package managers.task;
 
 import java.util.Objects;
+
 public class Task {
     protected int id;
     protected String title;
@@ -13,28 +14,28 @@ public class Task {
         this.status = TaskStatus.NEW;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Task task = (Task) o;
-        return id == task.id && Objects.equals(title, task.title) && Objects.equals(description, task.description) && status == task.status;
-    }
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, title, description, status);
-    }
-
     public int getId() {
         return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     public String getTitle() {
         return title;
     }
 
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
     public String getDescription() {
         return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public TaskStatus getStatus() {
@@ -45,21 +46,25 @@ public class Task {
         this.status = status;
     }
 
-    public void setId(int id) {
-        this.id = id;
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Task)) return false;
+        Task task = (Task) o;
+        return id == task.id &&
+                Objects.equals(title, task.title) &&
+                Objects.equals(description, task.description) &&
+                status == task.status;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, title, description, status);
     }
 
     @Override
     public String toString() {
-        return "taskmanager.Task{" +
+        return "Task{" +
                 "id=" + id +
                 ", title='" + title + '\'' +
                 ", description='" + description + '\'' +
