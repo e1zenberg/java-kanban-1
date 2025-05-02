@@ -1,6 +1,6 @@
-package managers;
+package managers.task;
 
-import managers.task.Task;
+import managers.HistoryManager;
 
 import java.util.*;
 
@@ -47,8 +47,7 @@ public class InMemoryHistoryManager implements HistoryManager {
         }
     }
 
-    @Override
-    public List<Task> getHistory() {
+    public List<managers.task.Task> getHistory() {
         List<Task> history = new ArrayList<>();
         Node current = head;
         while (current != null) {
