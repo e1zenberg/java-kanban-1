@@ -18,7 +18,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download JUnit 5
+      - name: Download JUnit 5 Console Standalone
         run: |
           mkdir -p lib
           curl -L -o lib/junit-platform-console-standalone-1.10.0.jar https://search.maven.org/remotecontent?filepath=org/junit/platform/junit-platform-console-standalone/1.10.0/junit-platform-console-standalone-1.10.0.jar
@@ -38,8 +38,6 @@ jobs:
 
       - name: Run tests
         run: |
-          for test in $(find src/test/java -name "*Test.java"); do
-            classname=$(echo $test | sed 's|src/test/java/||' | sed 's|/|.|g' | sed 's|.java$||')
-            echo "Running $classname"
-            java -cp "lib/*:out" org.junit.runner.JUnitCore "$classname"
-          done
+          java -jar lib/junit-platform-console-standalone-1.10.0.jar \
+            --class-path out \
+            --scan-class-path
