@@ -2,7 +2,42 @@ name: Java Tests
 
 on:
   pull_request:
+  push:
 
 jobs:
   build:
-    uses: yandex-praktikum/java-kanban/.github/workflows/api-tests.yml@ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Download JUnit 5 Console Standalone
+        run: |
+          mkdir -p lib
+          curl -L -o lib/junit-platform-console-standalone-1.10.0.jar https://search.maven.org/remotecontent?filepath=org/junit/platform/junit-platform-console-standalone/1.10.0/junit-platform-console-standalone-1.10.0.jar
+
+      - name: Create output directory
+        run: mkdir -p out
+
+      - name: Compile main sources
+        run: |
+          find src/main/java -name "*.java" > sources.txt
+          javac -d out @sources.txt
+
+      - name: Compile test sources
+        run: |
+          find src/test/java -name "*.java" > tests.txt
+          javac -cp "lib/*:out" -d out @tests.txt
+
+      - name: Run tests
+        run: |
+          java -jar lib/junit-platform-console-standalone-1.10.0.jar \
+            --class-path out \
+            --scan-class-path
