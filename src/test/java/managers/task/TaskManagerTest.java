@@ -1,4 +1,4 @@
-package test;
+package managers.task;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -144,4 +144,3 @@ public class TaskManagerTest {
         Assertions.assertEquals("Задача 15", history.get(9).getTitle(), "В истории не тот элемент на последнем месте");
     }
 }
-//не понимаю
