@@ -136,7 +136,7 @@ public class InMemoryTaskManager extends TaskManager {
         if (epic != null) {
             epic.setTitle(updatedEpic.getTitle());
             epic.setDescription(updatedEpic.getDescription());
-            updateEpicStatus(epic); // ✅ ключевая строка
+            updateEpicStatus(epic); //  ключевая строка
         }
     }
 
