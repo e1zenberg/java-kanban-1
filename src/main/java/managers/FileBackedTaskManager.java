@@ -73,8 +73,8 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 writer.newLine();
             }
 
-            writer.newLine(); // разделитель
-            writer.write(historyToString(getHistory()));
+            writer.newLine(); // Записываем пустую строку как разделитель между списком задач и историей просмотров
+            writer.write(historyToString(getHistory())); // Записываем историю просмотров задач в файл
         } catch (IOException e) {
             throw new RuntimeException("Ошибка при сохранении в файл", e);
         }

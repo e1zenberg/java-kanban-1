@@ -48,6 +48,6 @@ public class Main {
 
         taskManager.removeAllTasks();
 
-        System.out.println("Файл сохранён: " + file.getAbsolutePath());
+        System.out.printf("Файл сохранён: %s%n", file.getAbsolutePath());
     }
 }
