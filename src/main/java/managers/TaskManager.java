@@ -121,13 +121,22 @@ public abstract class TaskManager {
                 .collect(Collectors.toList());
     }
 
+    public abstract List<Task> getPrioritizedTasks();
+
     protected void updateEpicStatus(Epic epic) {
         if (epic == null) return;
         epic.updateEpicStatus(); // делегируем логику Epic-у
     }
 
+
     public abstract HistoryManager getHistory();
 
-    public void removeAllTasks() {
-    }
+    // Абстрактный метод для удаления всех задач
+    public abstract void removeAllTasks();
+
+    // Абстрактный метод для удаления всех эпиков
+    public abstract void removeAllEpics();
+
+    // Абстрактный метод для удаления всех подзадач
+    public abstract void removeAllSubtasks();
 }
