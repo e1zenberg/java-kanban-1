@@ -227,7 +227,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     public void addSubtask(Subtask subtask) {
         if (isTimeOverlap(subtask)) {
             throw new IllegalArgumentException(
-                    "Время подзадачи пересекается с другой задачей.");
+                    "Невозможно добавить подзадачу: её интервал выполнения пересекается с интервалом существующей задачи.");
         }
         super.addSubtask(subtask);
         save();

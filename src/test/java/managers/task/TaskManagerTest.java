@@ -48,8 +48,8 @@ public abstract class TaskManagerTest<T extends TaskManager> {
 
         Epic fetchedEpic = manager.getEpicById(epic.getId());
         Subtask fetchedSub = manager.getSubtaskById(sub.getId());
-        assertNotNull(fetchedEpic, "Эпик должен вернуться");
-        assertNotNull(fetchedSub, "Подзадача должна вернуться");
+        assertNotNull(fetchedEpic, "Добавленный эпик должен быть возвращен методом getEpicById");
+        assertNotNull(fetchedSub, "Добавленная подзадача должна быть возвращена методом getSubtaskById");
         assertEquals(epic.getId(), fetchedSub.getEpicId(),
                 "Подзадача должна ссылаться на правильный эпик");
     }
