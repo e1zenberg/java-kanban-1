@@ -1,10 +1,13 @@
 package managers;
 
 import managers.task.*;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class FileBackedTaskManager extends InMemoryTaskManager {
     private final File file;
@@ -19,19 +22,59 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         return manager;
     }
 
+    // ПЕРЕГРУЗКИ GET-методов, чтобы сохранять историю в файл
+    @Override
+    public Task getTaskById(int id) {
+        Task t = super.getTaskById(id);
+        save();
+        return t;
+    }
+
+    @Override
+    public Epic getEpicById(int id) {
+        Epic e = super.getEpicById(id);
+        save();
+        return e;
+    }
+
+    @Override
+    public Subtask getSubtaskById(int id) {
+        Subtask s = super.getSubtaskById(id);
+        save();
+        return s;
+    }
+
+    // Проверка пересечения по времени (касание не считается пересечением)
+    private boolean isTimeOverlap(Task newTask) {
+        return getPrioritizedTasks().stream()
+                .anyMatch(existing -> {
+                    LocalDateTime es = existing.getStartTime();
+                    LocalDateTime ee = existing.getEndTime();
+                    LocalDateTime ns = newTask.getStartTime();
+                    LocalDateTime ne = newTask.getEndTime();
+                    if (es == null || ee == null || ns == null || ne == null) {
+                        return false;
+                    }
+                    // пересечение: начало новой до конца существующей
+                    // и конец новой после начала существующей
+                    return ns.isBefore(ee) && ne.isAfter(es);
+                });
+    }
+
+    // Загрузка задач и истории из файла
     private void load() {
-        try (BufferedReader reader = new BufferedReader(new FileReader(file, StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(
+                new FileReader(file, StandardCharsets.UTF_8))) {
             String line;
-            boolean historySection = false;
-            Map<Integer, Task> loadedTasks = new HashMap<>();
+            boolean isHistory = false;
+            Map<Integer, Task> loaded = new HashMap<>();
 
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
-                    historySection = true;
+                    isHistory = true;
                     continue;
                 }
-
-                if (!historySection) {
+                if (!isHistory) {
                     Task task = fromString(line);
                     int id = task.getId();
                     if (task instanceof Epic) {
@@ -41,111 +84,135 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                     } else {
                         super.addTask(task);
                     }
-                    loadedTasks.put(id, task);
+                    loaded.put(id, task);
                 } else {
-                    String[] ids = line.split(",");
-                    for (String idStr : ids) {
-                        int id = Integer.parseInt(idStr);
-                        Task task = loadedTasks.get(id);
-                        if (task != null) {
-                            getHistory().add(task);
+                    // секция истории
+                    for (String idStr : line.split(",")) {
+                        Task t = loaded.get(Integer.parseInt(idStr));
+                        if (t != null) {
+                            getHistory().add(t);
                         }
                     }
                 }
             }
+            // пересчитать эпики
+            getAllEpics().forEach(Epic::updateEpicStatus);
         } catch (IOException e) {
-            throw new RuntimeException("Ошибка при чтении файла", e);
+            throw new RuntimeException(
+                    "Ошибка при загрузке из файла: " + file.getName(), e);
         }
     }
 
+    // Сохранение задач и истории в файл
     private void save() {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, StandardCharsets.UTF_8))) {
-            for (Task task : getAllTasks()) {
-                writer.write(toString(task));
+        try (BufferedWriter writer = new BufferedWriter(
+                new FileWriter(file, StandardCharsets.UTF_8))) {
+            for (Task t : getAllTasks()) {
+                writer.write(taskToString(t));
                 writer.newLine();
             }
-            for (Epic epic : getAllEpics()) {
-                writer.write(toString(epic));
+            for (Epic e : getAllEpics()) {
+                writer.write(taskToString(e));
                 writer.newLine();
             }
-            for (Subtask subtask : getAllSubtasks()) {
-                writer.write(toString(subtask));
+            for (Subtask s : getAllSubtasks()) {
+                writer.write(taskToString(s));
                 writer.newLine();
             }
-
-            writer.newLine(); // Записываем пустую строку как разделитель между списком задач и историей просмотров
-            writer.write(historyToString(getHistory())); // Записываем историю просмотров задач в файл
+            writer.newLine();
+            writer.write(historyToString(getHistory()));
         } catch (IOException e) {
-            throw new RuntimeException("Ошибка при сохранении в файл", e);
+            throw new RuntimeException(
+                    "Ошибка при сохранении в файл: " + file.getName(), e);
         }
     }
 
     private static String historyToString(HistoryManager history) {
-        List<Task> historyList = history.getHistory();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < historyList.size(); i++) {
-            sb.append(historyList.get(i).getId());
-            if (i < historyList.size() - 1) {
-                sb.append(",");
-            }
-        }
-        return sb.toString();
+        return history.getHistory().stream()
+                .map(t -> String.valueOf(t.getId()))
+                .collect(Collectors.joining(","));
     }
 
+    // Преобразование строки в задачу
     private static Task fromString(String line) {
-        String[] parts = line.split(",");
-        int id = Integer.parseInt(parts[0]);
-        TaskType type = TaskType.valueOf(parts[1]);
-        String title = parts[2];
-        TaskStatus status = TaskStatus.valueOf(parts[3]);
-        String description = parts[4];
+        // id,type,title,status,description,duration,startTime[,epicId]
+        String[] parts = line.split(",", -1);
+        int id                = Integer.parseInt(parts[0]);
+        TaskType type         = TaskType.valueOf(parts[1]);
+        String title          = parts[2];
+        TaskStatus status     = TaskStatus.valueOf(parts[3]);
+        String desc           = parts[4];
+        Duration dur          = parts[5].isEmpty()
+                ? null
+                : Duration.ofMinutes(Long.parseLong(parts[5]));
+        LocalDateTime start   = parts[6].isEmpty()
+                ? null
+                : LocalDateTime.parse(parts[6]);
 
         switch (type) {
-            case TASK:
-                Task task = new Task(title, description);
-                task.setId(id);
-                task.setStatus(status);
-                return task;
-            case EPIC:
-                Epic epic = new Epic(title, description);
-                epic.setId(id);
-                epic.setStatus(status);
-                return epic;
-            case SUBTASK:
-                int epicId = Integer.parseInt(parts[5]);
-                Subtask subtask = new Subtask(title, description, epicId);
-                subtask.setId(id);
-                subtask.setStatus(status);
-                return subtask;
-            default:
-                throw new IllegalArgumentException("Неизвестный тип задачи: " + type);
+            case TASK -> {
+                Task t = new Task(title, desc);
+                t.setId(id);
+                t.setStatus(status);
+                t.setDuration(dur);
+                t.setStartTime(start);
+                return t;
+            }
+            case EPIC -> {
+                Epic e = new Epic(title, desc);
+                e.setId(id);
+                e.setStatus(status);
+                return e;
+            }
+            case SUBTASK -> {
+                int epicId = Integer.parseInt(parts[7]);
+                Subtask s = new Subtask(title, desc, epicId);
+                s.setId(id);
+                s.setStatus(status);
+                s.setDuration(dur);
+                s.setStartTime(start);
+                return s;
+            }
+            default -> throw new IllegalArgumentException(
+                    "Неизвестный тип задачи: " + type);
         }
     }
 
-    private static String toString(Task task) {
-        String base = String.join(",", String.valueOf(task.getId()),
+    // Преобразование задачи в строку
+    private static String taskToString(Task task) {
+        String base = String.join(",",
+                String.valueOf(task.getId()),
                 getType(task).name(),
                 task.getTitle(),
                 task.getStatus().name(),
-                task.getDescription());
-
-        if (task instanceof Subtask subtask) {
-            return base + "," + subtask.getEpicId();
+                task.getDescription(),
+                task.getDuration() != null
+                        ? String.valueOf(task.getDuration().toMinutes())
+                        : "",
+                task.getStartTime() != null
+                        ? task.getStartTime().toString()
+                        : ""
+        );
+        if (task instanceof Subtask st) {
+            return base + "," + st.getEpicId();
         }
-
         return base;
     }
 
     private static TaskType getType(Task task) {
-        if (task instanceof Epic) return TaskType.EPIC;
+        if (task instanceof Epic)   return TaskType.EPIC;
         if (task instanceof Subtask) return TaskType.SUBTASK;
         return TaskType.TASK;
     }
 
-    // Перегружаем методы, чтобы сохранять при каждом изменении
 
+    // Переопределения CRUD-методов для сохранения после изменений
     @Override
     public void addTask(Task task) {
+        if (isTimeOverlap(task)) {
+            throw new IllegalArgumentException(
+                    "Время задачи пересекается с существующей задачей.");
+        }
         super.addTask(task);
         save();
     }
@@ -158,12 +225,20 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public void addSubtask(Subtask subtask) {
+        if (isTimeOverlap(subtask)) {
+            throw new IllegalArgumentException(
+                    "Время подзадачи пересекается с другой задачей.");
+        }
         super.addSubtask(subtask);
         save();
     }
 
     @Override
     public void updateTask(Task task) {
+        if (isTimeOverlap(task)) {
+            throw new IllegalArgumentException(
+                    "Обновлённая задача пересекается по времени с другой задачей.");
+        }
         super.updateTask(task);
         save();
     }
@@ -176,6 +251,10 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     @Override
     public void updateSubtask(Subtask subtask) {
+        if (isTimeOverlap(subtask)) {
+            throw new IllegalArgumentException(
+                    "Обновлённая подзадача пересекается по времени с другой задачей.");
+        }
         super.updateSubtask(subtask);
         save();
     }
@@ -201,6 +280,18 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     @Override
     public void removeAllTasks() {
         super.removeAllTasks();
+        save();
+    }
+
+    @Override
+    public void removeAllEpics() {
+        super.removeAllEpics();
+        save();
+    }
+
+    @Override
+    public void removeAllSubtasks() {
+        super.removeAllSubtasks();
         save();
     }
 }
