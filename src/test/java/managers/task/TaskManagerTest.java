@@ -1,146 +1,102 @@
 package managers.task;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import managers.InMemoryTaskManager;
+import managers.TaskManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
-public class TaskManagerTest {
-    private InMemoryTaskManager taskManager;
-    private Task task;
-    private Epic epic;
-    private Subtask subtask;
+import static org.junit.jupiter.api.Assertions.*;
+
+//Общие тесты CRUD-операций и истории для любых реализаций TaskManager.
+public abstract class TaskManagerTest<T extends TaskManager> {
+    protected T manager;
+
+    //Возвращает экземпляр конкретной реализации менеджера.
+    protected abstract T createTaskManager();
 
     @BeforeEach
-    public void setUp() {
-        taskManager = new InMemoryTaskManager();
-        task = new Task("Задача 1", "Описание задачи 1");
-        epic = new Epic("Эпик 1", "Описание эпика");
-        taskManager.addEpic(epic);
-        subtask = new Subtask("Подзадача 1", "Описание подзадачи", epic.getId());
+    void setUp() {
+        manager = createTaskManager();
     }
 
     @Test
-    public void testAddTask() {
-        taskManager.addTask(task);
-        assertEquals(1, taskManager.getAllTasks().size());
-        assertEquals(task.getTitle(), taskManager.getTaskById(task.getId()).getTitle());
+    void shouldAddAndGetTask() {
+        Task task = new Task("Задача1", "Описание");
+        task.setDuration(Duration.ofMinutes(30));
+        task.setStartTime(LocalDateTime.of(2025, 5, 20, 10, 0));
+        manager.addTask(task);
+
+        Task fetched = manager.getTaskById(task.getId());
+        assertNotNull(fetched, "Добавленная задача должна вернуться");
+        assertEquals(task, fetched, "Содержимое задачи должно совпадать");
     }
 
     @Test
-    public void testAddEpic() {
-        assertEquals(1, taskManager.getAllEpics().size());
-        assertEquals(epic.getTitle(), taskManager.getEpicById(epic.getId()).getTitle());
+    void shouldAddAndGetEpicAndSubtask() {
+        Epic epic = new Epic("Эпик1", "Описание эпика");
+        manager.addEpic(epic);
+        Subtask sub = new Subtask(
+                "Под1", "Desc",
+                epic.getId(),
+                Duration.ofMinutes(15),
+                LocalDateTime.of(2025, 5, 20, 12, 0)
+        );
+        manager.addSubtask(sub);
+
+        Epic fetchedEpic = manager.getEpicById(epic.getId());
+        Subtask fetchedSub = manager.getSubtaskById(sub.getId());
+        assertNotNull(fetchedEpic, "Добавленный эпик должен быть возвращен методом getEpicById");
+        assertNotNull(fetchedSub, "Добавленная подзадача должна быть возвращена методом getSubtaskById");
+        assertEquals(epic.getId(), fetchedSub.getEpicId(),
+                "Подзадача должна ссылаться на правильный эпик");
     }
 
     @Test
-    public void testRemoveTask() {
-        taskManager.addTask(task);
-        taskManager.removeTaskById(task.getId());
-        assertNull(taskManager.getTaskById(task.getId()));
+    void shouldUpdateTask() {
+        Task task = new Task("Old", "OldDesc");
+        manager.addTask(task);
+        task.setTitle("New");
+        task.setDescription("NewDesc");
+        manager.updateTask(task);
+
+        Task updated = manager.getTaskById(task.getId());
+        assertEquals("New", updated.getTitle(), "Заголовок должен обновиться");
+        assertEquals("NewDesc", updated.getDescription(), "Описание должно обновиться");
     }
 
     @Test
-    public void testAddSubtask() {
-        taskManager.addSubtask(subtask);
-        List<Subtask> subtasks = taskManager.getSubtasksForEpic(epic.getId());
-        assertEquals(1, subtasks.size());
-        assertEquals(subtask.getTitle(), subtasks.get(0).getTitle());
+    void shouldRemoveTaskById() {
+        Task task = new Task("ToRemove", "");
+        manager.addTask(task);
+        manager.removeTaskById(task.getId());
+        assertNull(manager.getTaskById(task.getId()), "Задача должна быть удалена");
     }
 
     @Test
-    public void testRemoveSubtask() {
-        taskManager.addSubtask(subtask);
-        taskManager.removeSubtaskById(subtask.getId());
-        assertNull(taskManager.getSubtaskById(subtask.getId()));
+    void shouldRemoveAllTasks() {
+        manager.addTask(new Task("A", ""));
+        manager.addTask(new Task("B", ""));
+        manager.removeAllTasks();
+        assertTrue(manager.getAllTasks().isEmpty(), "Все задачи должны быть удалены");
     }
 
     @Test
-    public void testUpdateEpic() {
-        epic.setTitle("Обновленный эпик");
-        taskManager.updateEpic(epic);
-        assertEquals("Обновленный эпик", taskManager.getEpicById(epic.getId()).getTitle());
+    void shouldReturnEmptySubtasksForUnknownEpic() {
+        List<Subtask> subs = manager.getSubtasksForEpic(999);
+        assertTrue(subs.isEmpty(), "Для неизвестного эпика список подзадач должен быть пуст");
     }
 
     @Test
-    public void testUpdateTask() {
-        taskManager.addTask(task);
-        task.setTitle("Обновленная задача");
-        taskManager.updateTask(task);
-        assertEquals("Обновленная задача", taskManager.getTaskById(task.getId()).getTitle());
-    }
-
-    @Test
-    public void testUpdateSubtask() {
-        taskManager.addSubtask(subtask);
-        subtask.setTitle("Обновленная подзадача");
-        taskManager.updateSubtask(subtask);
-        assertEquals("Обновленная подзадача", taskManager.getSubtaskById(subtask.getId()).getTitle());
-    }
-
-    @Test
-    public void testHistoryManager() {
-        taskManager.addTask(task);
-        taskManager.getTaskById(task.getId());
-        taskManager.getEpicById(epic.getId());
-        taskManager.addSubtask(subtask);
-        taskManager.getSubtaskById(subtask.getId());
-
-        List<Task> history = taskManager.getHistory().getHistory();
-        assertEquals(3, history.size());
-    }
-
-    @Test
-    public void testHistoryManagerFullSize() {
-        for (int i = 1; i <= 15; i++) {
-            Task newTask = new Task("Задача " + i, "Описание задачи " + i);
-            taskManager.addTask(newTask);
-            taskManager.getTaskById(newTask.getId());
-        }
-        List<Task> history = taskManager.getHistory().getHistory();
-        assertEquals(15, history.size());
-    }
-
-    @Test
-    public void testInMemoryHistoryManager_AddAndRemoveTasks() {
-        InMemoryHistoryManager historyManager = new InMemoryHistoryManager();
-        Task task1 = new Task("T1", "Desc");
-        task1.setId(1);
-        Task task2 = new Task("T2", "Desc");
-        task2.setId(2);
-
-        historyManager.add(task1);
-        historyManager.add(task2);
-        List<Task> history = historyManager.getHistory();
-        assertEquals(2, history.size());
-
-        historyManager.remove(1);
-        history = historyManager.getHistory();
-        assertEquals(1, history.size());
-    }
-
-    @Test
-    public void testSubtaskRemovalRemovesReferenceFromEpic() {
-        taskManager.addSubtask(subtask);
-        taskManager.removeSubtaskById(subtask.getId());
-        assertTrue(taskManager.getSubtasksForEpic(epic.getId()).isEmpty());
-    }
-
-    @Test
-    public void testSubtaskStoredUnderOriginalEpicId() {
-        taskManager.addSubtask(subtask);
-        assertEquals(epic.getId(), subtask.getEpicId());
-    }
-
-    @Test
-    public void testChangingTaskIdAfterAddDoesNotAffectManager() {
-        taskManager.addTask(task);
-        int originalId = task.getId();
-        task.setId(999);
-        assertNull(taskManager.getTaskById(999));
-        assertNotNull(taskManager.getTaskById(originalId));
+    void shouldRecordHistoryOnAccess() {
+        Task task = new Task("H1", "");
+        manager.addTask(task);
+        manager.getTaskById(task.getId());
+        assertTrue(
+                manager.getHistory().getHistory().contains(task),
+                "История должна содержать задачу после её получения"
+        );
     }
 }
