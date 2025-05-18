@@ -133,49 +133,49 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                 .collect(Collectors.joining(","));
     }
 
-    // Преобразование строки в задачу
-    private static Task fromString(String line) {
-        // id,type,title,status,description,duration,startTime[,epicId]
-        String[] parts = line.split(",", -1);
-        int id                = Integer.parseInt(parts[0]);
-        TaskType type         = TaskType.valueOf(parts[1]);
-        String title          = parts[2];
-        TaskStatus status     = TaskStatus.valueOf(parts[3]);
-        String desc           = parts[4];
-        Duration dur          = parts[5].isEmpty()
-                ? null
-                : Duration.ofMinutes(Long.parseLong(parts[5]));
-        LocalDateTime start   = parts[6].isEmpty()
-                ? null
-                : LocalDateTime.parse(parts[6]);
 
-        switch (type) {
+    // Преобразовать одну CSV-строку в объект Task/Epic/Subtask
+    private static Task fromString(String csvLine) {
+        // Формат: id,type,title,status,description,duration,startTime[,epicId]
+        String[] fields = csvLine.split(",", -1);
+
+        int id           = Integer.parseInt(fields[0]);
+        TaskType type    = TaskType.valueOf(fields[1]);
+        String title     = fields[2];
+        TaskStatus status= TaskStatus.valueOf(fields[3]);
+        String desc      = fields[4];
+        Duration dur     = fields[5].isEmpty()
+                ? null
+                : Duration.ofMinutes(Long.parseLong(fields[5]));
+        LocalDateTime start = fields[6].isEmpty()
+                ? null
+                : LocalDateTime.parse(fields[6]);
+
+        return switch (type) {
             case TASK -> {
                 Task t = new Task(title, desc);
                 t.setId(id);
                 t.setStatus(status);
                 t.setDuration(dur);
                 t.setStartTime(start);
-                return t;
+                yield t;
             }
             case EPIC -> {
                 Epic e = new Epic(title, desc);
                 e.setId(id);
                 e.setStatus(status);
-                return e;
+                yield e;
             }
             case SUBTASK -> {
-                int epicId = Integer.parseInt(parts[7]);
+                int epicId = Integer.parseInt(fields[7]);
                 Subtask s = new Subtask(title, desc, epicId);
                 s.setId(id);
                 s.setStatus(status);
                 s.setDuration(dur);
                 s.setStartTime(start);
-                return s;
+                yield s;
             }
-            default -> throw new IllegalArgumentException(
-                    "Неизвестный тип задачи: " + type);
-        }
+        };
     }
 
     // Преобразование задачи в строку

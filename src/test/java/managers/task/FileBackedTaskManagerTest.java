@@ -79,14 +79,14 @@ class FileBackedTaskManagerTest extends TaskManagerTest<FileBackedTaskManager> {
 
     @Test
     void shouldMaintainHistoryAfterLoad() {
-        Task t = new Task("H1", "");
+        Task t = new Task("TaskForHistoryTest", "");
         manager.addTask(t);
         manager.getTaskById(t.getId());
-        Epic e = new Epic("HE", "");
+        Epic e = new Epic("EpicForHistoryTest", "");
         manager.addEpic(e);
         manager.getEpicById(e.getId());
         Subtask s = new Subtask(
-                "HS", "", e.getId(),
+                "HistorySubtask", "", e.getId(),
                 Duration.ofMinutes(5), LocalDateTime.of(2025,5,20,11,0)
         );
         manager.addSubtask(s);

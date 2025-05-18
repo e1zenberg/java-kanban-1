@@ -48,7 +48,7 @@ public abstract class BaseHttpHandler implements HttpHandler {
                                 if (json == null || json.getAsString().isEmpty()) return null;
                                 return Duration.parse(json.getAsString());
                             } catch (Exception e) {
-                                throw new JsonParseException("Не удалось распарсить Duration: " + json, e);
+                                throw new JsonParseException(String.format("Не удалось распарсить Duration: %s", json.getAsString()), e);
                             }
                         })
                 .registerTypeAdapter(LocalDateTime.class,
@@ -60,7 +60,7 @@ public abstract class BaseHttpHandler implements HttpHandler {
                                 if (json == null || json.getAsString().isEmpty()) return null;
                                 return LocalDateTime.parse(json.getAsString());
                             } catch (Exception e) {
-                                throw new JsonParseException("Не удалось распарсить LocalDateTime: " + json, e);
+                                throw new JsonParseException(String.format("Не удалось распарсить LocalDateTime: %s", json.getAsString()), e);
                             }
                         })
                 .create();
